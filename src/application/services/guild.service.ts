@@ -54,4 +54,21 @@ export class GuildService {
     sortByLevelDesc(members: GuildMember[]) {
         return [...members].sort((a, b) => b.level - a.level);
     }
+
+    async getFullGuildAnalysis() {
+        const guild = await this.getGuildData();
+        const onlineMembers = this.filterOnlineMembers(guild.members);
+
+        return {
+            info: {
+                name: guild.name,
+                online: onlineMembers.length,
+                offline: guild.members.length - onlineMembers.length,
+                total: guild.members.length,
+            },
+            vocations: this.groupByVocation(onlineMembers, true),
+            byLevel: this.splitByLevel(onlineMembers),
+            sorted: this.sortByLevelDesc(onlineMembers),
+        };
+    }
 }
