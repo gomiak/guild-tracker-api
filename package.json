@@ -8,7 +8,11 @@
         "build": "tsc",
         "start": "node dist/index.js",
         "clean": "rimraf dist",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "predev": "prisma generate",
+        "pretest": "prisma generate",
+        "db:generate": "prisma generate",
+        "db:studio": "prisma studio"
     },
     "repository": {
         "type": "git",
