@@ -1,11 +1,33 @@
 import { IGuildRepository } from '../../domain/entities/repositories/guild.repository';
 import { Guild, GuildMember } from '../../domain/entities/guild.entity';
+import { prisma } from '../../lib/prisma';
 
 export class GuildService {
     constructor(private guildRepository: IGuildRepository) {}
 
     async getGuildData(): Promise<Guild> {
-        return this.guildRepository.getGuildData();
+        const guildData = await this.guildRepository.getGuildData();
+
+        for (const member of guildData.members) {
+            await prisma.guildMember.upsert({
+                where: { name: member.name },
+                update: {
+                    level: member.level,
+                    vocation: member.vocation,
+                    status: member.status,
+                    lastSeen: new Date(),
+                },
+                create: {
+                    name: member.name,
+                    level: member.level,
+                    vocation: member.vocation,
+                    status: member.status,
+                    lastSeen: new Date(),
+                },
+            });
+        }
+
+        return guildData;
     }
 
     filterOnlineMembers(members: GuildMember[]): GuildMember[] {
@@ -69,6 +91,19 @@ export class GuildService {
             vocations: this.groupByVocation(onlineMembers, true),
             byLevel: this.splitByLevel(onlineMembers),
             sorted: this.sortByLevelDesc(onlineMembers),
+        };
+    }
+    async getHistoricalData() {
+        const allMembers = await prisma.guildMember.findMany();
+
+        return {
+            totalMembers: allMembers.length,
+            averageLevel:
+                allMembers.reduce(
+                    (sum: number, m: GuildMember) => sum + m.level,
+                    0,
+                ) / allMembers.length,
+            vocationDistribution: this.groupByVocation(allMembers, true),
         };
     }
 }
