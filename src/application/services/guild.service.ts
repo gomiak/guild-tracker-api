@@ -16,38 +16,53 @@ export class GuildService {
 
         const freshData = await this.guildRepository.getGuildData();
 
-        await this.syncOnlyOnlineMembers(freshData.members);
+        // await this.syncOnlyOnlineMembers(freshData.members);
 
         tibiaDataCache.set(CACHE_KEY, freshData);
         return freshData;
     }
 
-    private async syncOnlyOnlineMembers(members: GuildMember[]): Promise<void> {
-        const onlineMembers = members.filter((m) => m.status === 'online');
+    // private async syncOnlyOnlineMembers(members: GuildMember[]): Promise<void> {
+    //     const onlineMembers = members.filter((m) => m.status === 'online');
 
-        if (onlineMembers.length === 0) return;
+    //     if (onlineMembers.length === 0) return;
 
-        const transactions = onlineMembers.map((member) =>
-            prisma.guildMember.upsert({
-                where: { name: member.name },
-                update: {
-                    level: member.level,
-                    vocation: member.vocation,
-                    status: member.status,
-                    lastSeen: new Date(),
-                },
-                create: {
-                    name: member.name,
-                    level: member.level,
-                    vocation: member.vocation,
-                    status: member.status,
-                    lastSeen: new Date(),
-                },
-            }),
-        );
+    //     const dbMembers = await prisma.guildMember.findMany({
+    //         where: { name: { in: onlineMembers.map((m) => m.name) } },
+    //     });
+    //     const dbMembersMap = new Map(dbMembers.map((m) => [m.name, m]));
 
-        await prisma.$transaction(transactions);
-    }
+    //     const transactions = onlineMembers.map((member) => {
+    //         const existingMember = dbMembersMap.get(member.name);
+
+    //         let lastSeen: Date;
+    //         if (!existingMember || existingMember.status === 'offline') {
+    //             lastSeen = new Date();
+    //         } else {
+    //             lastSeen = existingMember.lastSeen!;
+    //         }
+
+    //         return prisma.guildMember.upsert({
+    //             where: { name: member.name },
+    //             update: {
+    //                 level: member.level,
+    //                 vocation: member.vocation,
+    //                 status: member.status,
+    //                 lastSeen: lastSeen,
+    //             },
+    //             create: {
+    //                 name: member.name,
+    //                 level: member.level,
+    //                 vocation: member.vocation,
+    //                 status: member.status,
+    //                 lastSeen: lastSeen,
+    //             },
+    //         });
+    //     });
+
+    //     await prisma.$transaction(transactions);
+    // }
+
     async getGuildData(): Promise<Guild> {
         return this.getGuildDataWithCache();
     }
@@ -139,5 +154,9 @@ export class GuildService {
                 ) / allMembers.length,
             vocationDistribution: this.groupByVocation(allMembers, true),
         };
+    }
+
+    async cleanupOfflineMessages(): Promise<void> {
+        await this.guildRepository.cleanupOfflineMembersMessages();
     }
 }

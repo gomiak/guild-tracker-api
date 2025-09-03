@@ -3,6 +3,7 @@ export interface GuildMember {
     vocation: string;
     level: number;
     status: string;
+    lastSeen: Date | null;
 }
 
 export interface Guild {
