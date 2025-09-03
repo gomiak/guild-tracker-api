@@ -3,7 +3,6 @@ import { prisma } from '../../lib/prisma';
 
 const router = express.Router();
 
-// GET - Buscar todas as mensagens
 router.get('/', async (req, res) => {
     try {
         const messages = await prisma.memberMessage.findMany();
@@ -13,23 +12,26 @@ router.get('/', async (req, res) => {
     }
 });
 
-// POST - Criar/atualizar mensagem
 router.post('/', async (req, res) => {
     try {
         const { name, message } = req.body;
-        
+
         if (!name || !message) {
-            return res.status(400).json({ error: 'Nome e mensagem são obrigatórios' });
+            return res
+                .status(400)
+                .json({ error: 'Nome e mensagem são obrigatórios' });
         }
 
         if (message.length > 50) {
-            return res.status(400).json({ error: 'Mensagem deve ter no máximo 50 caracteres' });
+            return res
+                .status(400)
+                .json({ error: 'Mensagem deve ter no máximo 50 caracteres' });
         }
 
         const memberMessage = await prisma.memberMessage.upsert({
             where: { name },
             update: { message },
-            create: { name, message }
+            create: { name, message },
         });
 
         res.json(memberMessage);
