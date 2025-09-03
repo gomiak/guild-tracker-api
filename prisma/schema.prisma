@@ -20,7 +20,7 @@ model GuildMember {
   level       Int
   vocation    String
   status      String    // 'online' | 'offline'
-  lastSeen    DateTime  // Para calcular tempo online
+  lastSeen    DateTime?  // Para calcular tempo online
   observation String?   // Para observações do usuário
   
   @@map("guild_members")
