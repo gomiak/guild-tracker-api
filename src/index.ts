@@ -50,7 +50,7 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         endpoints: {
             guildData: '/api/guild/data',
-            messages: '/api/messages',
+            messages: '/api/messages/data',
             forceRefresh: '/api/guild/force-refresh',
             health: '/health',
         },
