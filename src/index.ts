@@ -11,6 +11,18 @@ app.use(express.json());
 
 app.use('/api/guild', guildRoutes);
 
+app.get('/', (req, res) => {
+    res.json({
+        message: 'Guild Tracker API',
+        version: '1.0.0',
+        endpoints: {
+            guildData: '/api/guild/data',
+            forceRefresh: '/api/guild/force-refresh',
+            health: '/api/guild/health',
+        },
+    });
+});
+
 app.use(
     (
         error: any,
@@ -26,4 +38,5 @@ app.use(
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Endpoints available at http://localhost:${PORT}/api/guild`);
+    console.log(`⚡ Cache configurado: 30 segundos`);
 });

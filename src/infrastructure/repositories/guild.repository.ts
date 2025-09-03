@@ -4,9 +4,11 @@ import { prisma } from '../../lib/prisma';
 import { GuildMember } from '../../domain/entities/guild.entity';
 
 export class GuildRepository implements IGuildRepository {
-    private readonly API_URL =
-        'https://api.tibiadata.com/v4/guild/felizes%20para%20sempre';
+    private readonly API_URL: string;
 
+    constructor() {
+        this.API_URL = 'https://api.tibiadata.com/v4/guild/penumbra%20pune';
+    }
     async getGuildData(): Promise<Guild> {
         try {
             const response = await fetch(this.API_URL);

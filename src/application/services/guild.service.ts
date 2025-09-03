@@ -1,15 +1,34 @@
 import { IGuildRepository } from '../../domain/entities/repositories/guild.repository';
 import { Guild, GuildMember } from '../../domain/entities/guild.entity';
 import { prisma } from '../../lib/prisma';
+import { tibiaDataCache, analysisCache } from '../../lib/cache';
 
 export class GuildService {
     constructor(private guildRepository: IGuildRepository) {}
 
-    async getGuildData(): Promise<Guild> {
-        const guildData = await this.guildRepository.getGuildData();
+    private async getGuildDataWithCache(): Promise<Guild> {
+        const CACHE_KEY = 'tibiadata-fresh';
+        const cached = tibiaDataCache.get<Guild>(CACHE_KEY);
 
-        for (const member of guildData.members) {
-            await prisma.guildMember.upsert({
+        if (cached) {
+            return cached;
+        }
+
+        const freshData = await this.guildRepository.getGuildData();
+
+        await this.syncOnlyOnlineMembers(freshData.members);
+
+        tibiaDataCache.set(CACHE_KEY, freshData);
+        return freshData;
+    }
+
+    private async syncOnlyOnlineMembers(members: GuildMember[]): Promise<void> {
+        const onlineMembers = members.filter((m) => m.status === 'online');
+
+        if (onlineMembers.length === 0) return;
+
+        const transactions = onlineMembers.map((member) =>
+            prisma.guildMember.upsert({
                 where: { name: member.name },
                 update: {
                     level: member.level,
@@ -24,10 +43,41 @@ export class GuildService {
                     status: member.status,
                     lastSeen: new Date(),
                 },
-            });
+            }),
+        );
+
+        await prisma.$transaction(transactions);
+    }
+    async getGuildData(): Promise<Guild> {
+        return this.getGuildDataWithCache();
+    }
+
+    async getFullGuildAnalysis() {
+        const CACHE_KEY = 'guild-analysis';
+        const cached = analysisCache.get<any>(CACHE_KEY);
+
+        if (cached) {
+            return cached;
         }
 
-        return guildData;
+        const guild = await this.getGuildDataWithCache();
+        const onlineMembers = this.filterOnlineMembers(guild.members);
+
+        const analysis = {
+            info: {
+                name: guild.name,
+                online: onlineMembers.length,
+                offline: guild.members.length - onlineMembers.length,
+                total: guild.members.length,
+            },
+            vocations: this.groupByVocation(onlineMembers, true),
+            byLevel: this.splitByLevel(onlineMembers),
+            sorted: this.sortByLevelDesc(onlineMembers),
+            lastUpdated: new Date().toISOString(),
+        };
+
+        analysisCache.set(CACHE_KEY, analysis);
+        return analysis;
     }
 
     filterOnlineMembers(members: GuildMember[]): GuildMember[] {
@@ -77,22 +127,6 @@ export class GuildService {
         return [...members].sort((a, b) => b.level - a.level);
     }
 
-    async getFullGuildAnalysis() {
-        const guild = await this.getGuildData();
-        const onlineMembers = this.filterOnlineMembers(guild.members);
-
-        return {
-            info: {
-                name: guild.name,
-                online: onlineMembers.length,
-                offline: guild.members.length - onlineMembers.length,
-                total: guild.members.length,
-            },
-            vocations: this.groupByVocation(onlineMembers, true),
-            byLevel: this.splitByLevel(onlineMembers),
-            sorted: this.sortByLevelDesc(onlineMembers),
-        };
-    }
     async getHistoricalData() {
         const allMembers = await prisma.guildMember.findMany();
 
