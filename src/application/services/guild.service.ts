@@ -39,8 +39,8 @@ export class GuildService {
             info: {
                 name: guild.name,
                 online: onlineMembers.length,
-                offline: guild.members.length - onlineMembers.length,
-                total: guild.members.length,
+                offline: guild.playersOffline,
+                total: guild.playersOffline,
             },
             vocations: this.groupByVocation(onlineMembers, true),
             byLevel: this.splitByLevel(onlineMembers),
