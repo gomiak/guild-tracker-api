@@ -3,6 +3,15 @@ import { Guild } from '../../domain/entities/guild.entity';
 import { prisma } from '../../lib/prisma';
 import { GuildMember } from '../../domain/entities/guild.entity';
 
+// ✅ Interface para os membros do banco
+interface DatabaseMember {
+    name: string;
+    level: number;
+    vocation: string;
+    status: string;
+    lastSeen: Date | null;
+}
+
 export class GuildRepository implements IGuildRepository {
     private readonly API_URL: string;
 
@@ -30,7 +39,8 @@ export class GuildRepository implements IGuildRepository {
     }
 
     private async syncMembersToDatabase(members: any[]): Promise<void> {
-        const dbMembers = await prisma.guildMember.findMany();
+        const dbMembers =
+            (await prisma.guildMember.findMany()) as unknown as DatabaseMember[];
         const dbMembersMap = new Map(dbMembers.map((m) => [m.name, m]));
 
         const transactions = [];
@@ -73,12 +83,12 @@ export class GuildRepository implements IGuildRepository {
 
     private async mapToDomain(apiData: any): Promise<Guild> {
         try {
-            const onlineMembers = await prisma.guildMember.findMany({
+            const onlineMembers = (await prisma.guildMember.findMany({
                 where: {
                     status: 'online',
-                    lastSeen: { not: null as any },
+                    lastSeen: { not: null },
                 },
-            });
+            })) as unknown as DatabaseMember[];
 
             const onlineMembersMap = new Map(
                 onlineMembers.map((m) => [m.name, m.lastSeen]),
@@ -107,29 +117,55 @@ export class GuildRepository implements IGuildRepository {
     }
 
     async getMembersFromDatabase(): Promise<GuildMember[]> {
-        return prisma.guildMember.findMany();
+        const members =
+            (await prisma.guildMember.findMany()) as unknown as DatabaseMember[];
+        return members.map((m) => ({
+            name: m.name,
+            level: m.level,
+            vocation: m.vocation,
+            status: m.status,
+            lastSeen: m.lastSeen || new Date(),
+        }));
     }
 
     async getOnlineMembersFromDatabase(): Promise<GuildMember[]> {
-        return prisma.guildMember.findMany({
+        const members = (await prisma.guildMember.findMany({
             where: {
                 status: 'online',
-                lastSeen: { not: null as any },
+                lastSeen: { not: null },
             },
-        });
+        })) as unknown as DatabaseMember[];
+
+        return members.map((m) => ({
+            name: m.name,
+            level: m.level,
+            vocation: m.vocation,
+            status: m.status,
+            lastSeen: m.lastSeen || new Date(),
+        }));
     }
 
     async getMemberByName(name: string): Promise<GuildMember | null> {
-        return prisma.guildMember.findUnique({
+        const member = (await prisma.guildMember.findUnique({
             where: { name },
-        });
+        })) as unknown as DatabaseMember | null;
+
+        if (!member) return null;
+
+        return {
+            name: member.name,
+            level: member.level,
+            vocation: member.vocation,
+            status: member.status,
+            lastSeen: member.lastSeen || new Date(),
+        };
     }
 
     async cleanupOfflineMembersMessages(): Promise<void> {
         try {
-            const offlineMembers = await prisma.guildMember.findMany({
+            const offlineMembers = (await prisma.guildMember.findMany({
                 where: { status: 'offline' },
-            });
+            })) as unknown as DatabaseMember[];
 
             for (const member of offlineMembers) {
                 await prisma.memberMessage.deleteMany({
