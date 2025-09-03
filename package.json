@@ -11,6 +11,7 @@
         "test": "echo \"Error: no test specified\" && exit 1",
         "predev": "prisma generate",
         "pretest": "prisma generate",
+        "prebuild": "prisma generate",
         "db:generate": "prisma generate",
         "db:studio": "prisma studio"
     },
