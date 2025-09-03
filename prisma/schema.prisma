@@ -25,3 +25,12 @@ model GuildMember {
   
   @@map("guild_members")
 }
+
+model MemberMessage {
+  id      Int    @id @default(autoincrement())
+  name    String @unique
+  message String
+  updatedAt DateTime @updatedAt
+
+  @@map("member_messages")
+}
