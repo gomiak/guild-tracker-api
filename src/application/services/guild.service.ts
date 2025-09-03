@@ -16,7 +16,6 @@ export class GuildService {
 
         const freshData = await this.guildRepository.getGuildData();
 
-
         tibiaDataCache.set(CACHE_KEY, freshData);
         return freshData;
     }
