@@ -6,12 +6,14 @@ import messagesRoutes from './presentation/routes/messages.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
 const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
     'https://guild-tracker-i9r2.vercel.app',
     'https://*.vercel.app',
 ];
+
 app.use(
     cors({
         origin: function (origin, callback) {
@@ -40,6 +42,7 @@ app.use(
 app.use(express.json());
 
 app.use('/api/guild', guildRoutes);
+app.use('/api/messages', messagesRoutes);
 
 app.get('/', (req, res) => {
     res.json({
@@ -47,8 +50,9 @@ app.get('/', (req, res) => {
         version: '1.0.0',
         endpoints: {
             guildData: '/api/guild/data',
+            messages: '/api/messages',
             forceRefresh: '/api/guild/force-refresh',
-            health: '/api/guild/health',
+            health: '/health',
         },
     });
 });
@@ -64,8 +68,7 @@ app.use(
         res.status(500).json({ error: 'Internal server error' });
     },
 );
-app.use('/api/messages', messagesRoutes);
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
