@@ -7,18 +7,16 @@ import messagesRoutes from './presentation/routes/messages.routes';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
-    'http://localhost:3000', // Frontend local
-    'http://localhost:3001', // Backend local (se applicable)
-    'https://seu-frontend.vercel.app', // Seu futuro domínio Vercel
-    'https://*.vercel.app', // Todos subdomínios Vercel
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://guild-tracker-i9r2.vercel.app',
+    'https://*.vercel.app',
 ];
 app.use(
     cors({
         origin: function (origin, callback) {
-            // Permite requests sem origin (Postman, mobile apps, etc)
             if (!origin) return callback(null, true);
 
-            // Verifica se a origin está na lista permitida
             if (
                 allowedOrigins.some(
                     (allowedOrigin) =>
@@ -30,12 +28,12 @@ app.use(
                 return callback(null, true);
             }
 
-            // Rejeita requests de origens não permitidas
             return callback(
                 new Error('CORS policy: Origin not allowed'),
                 false,
             );
         },
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         credentials: true,
     }),
 );
