@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import guildRoutes from './presentation/routes/guild.routes';
+import messagesRoutes from './presentation/routes/messages.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,9 +35,8 @@ app.use(
         res.status(500).json({ error: 'Internal server error' });
     },
 );
+app.use('/api/messages', messagesRoutes);
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📊 Endpoints available at http://localhost:${PORT}/api/guild`);
-    console.log(`⚡ Cache configurado: 30 segundos`);
+    console.log(`Server running on port ${PORT}`);
 });
