@@ -2,19 +2,14 @@ import express from 'express';
 import { GuildService } from '../../application/services/guild.service';
 import { GuildRepository } from '../../infrastructure/repositories/guild.repository';
 import { tibiaDataCache, analysisCache } from '../../lib/cache';
+import { GuildController } from '../controllers/guild.controller';
 
 const router = express.Router();
+const guildController = new GuildController(
+    new GuildService(new GuildRepository()),
+);
 
-router.get('/data', async (req, res) => {
-    try {
-        const guildService = new GuildService(new GuildRepository());
-        const data = await guildService.getFullGuildAnalysis();
-
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ error: 'Erro ao buscar dados da guilda' });
-    }
-});
+router.get('/data', guildController.getGuildAnalysis);
 
 router.get('/force-refresh', async (req, res) => {
     try {
@@ -43,5 +38,9 @@ router.get('/health', (req, res) => {
         },
     });
 });
+
+// Rotas para marcar/desmarcar membros como exitados
+router.post('/mark-exited/:memberName', guildController.markMemberAsExited);
+router.post('/unmark-exited/:memberName', guildController.unmarkMemberAsExited);
 
 export default router;

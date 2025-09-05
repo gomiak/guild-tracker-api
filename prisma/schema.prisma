@@ -21,6 +21,7 @@ model GuildMember {
   status      String    // 'online' | 'offline'
   lastSeen    DateTime?  // Para calcular tempo online
   observation String?   // Para observações do usuário
+  isExited    Boolean  @default(false)  // Para marcar membros como exitados
   
   @@map("guild_members")
 }

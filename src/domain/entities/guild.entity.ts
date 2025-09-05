@@ -4,6 +4,7 @@ export interface GuildMember {
     level: number;
     status: string;
     lastSeen: Date | null;
+    isExited: boolean;
 }
 
 export interface Guild {

@@ -21,4 +21,34 @@ export class GuildController {
             timestamp: new Date().toISOString(),
         });
     };
+
+    markMemberAsExited = async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { memberName } = req.params;
+            await this.guildService.markMemberAsExited(memberName);
+            res.json({ success: true, message: 'Membro marcado como exitado' });
+        } catch (error) {
+            console.error('Error marking member as exited:', error);
+            res.status(500).json({ error: 'Failed to mark member as exited' });
+        }
+    };
+
+    unmarkMemberAsExited = async (
+        req: Request,
+        res: Response,
+    ): Promise<void> => {
+        try {
+            const { memberName } = req.params;
+            await this.guildService.unmarkMemberAsExited(memberName);
+            res.json({
+                success: true,
+                message: 'Membro desmarcado como exitado',
+            });
+        } catch (error) {
+            console.error('Error unmarking member as exited:', error);
+            res.status(500).json({
+                error: 'Failed to unmark member as exited',
+            });
+        }
+    };
 }

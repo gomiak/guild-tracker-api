@@ -3,13 +3,13 @@ import { Guild } from '../../domain/entities/guild.entity';
 import { prisma } from '../../lib/prisma';
 import { GuildMember } from '../../domain/entities/guild.entity';
 
-// ✅ Interface para os membros do banco
 interface DatabaseMember {
     name: string;
     level: number;
     vocation: string;
     status: string;
     lastSeen: Date | null;
+    isExited: boolean;
 }
 
 export class GuildRepository implements IGuildRepository {
@@ -94,18 +94,28 @@ export class GuildRepository implements IGuildRepository {
                 onlineMembers.map((m) => [m.name, m.lastSeen]),
             );
 
+            // Buscar todos os membros do banco para incluir o campo isExited
+            const allDbMembers = await prisma.guildMember.findMany();
+            const dbMembersMap = new Map(
+                allDbMembers.map((m: any) => [m.name, m]),
+            );
+
             return {
                 name: apiData.guild.name,
                 members: apiData.guild.members
                     .filter((member: any) => member.status === 'online')
-                    .map((member: any) => ({
-                        name: member.name,
-                        level: member.level,
-                        vocation: member.vocation,
-                        status: member.status,
-                        lastSeen:
-                            onlineMembersMap.get(member.name) || new Date(),
-                    })),
+                    .map((member: any) => {
+                        const dbMember = dbMembersMap.get(member.name);
+                        return {
+                            name: member.name,
+                            level: member.level,
+                            vocation: member.vocation,
+                            status: member.status,
+                            lastSeen:
+                                onlineMembersMap.get(member.name) || new Date(),
+                            isExited: (dbMember as any)?.isExited || false,
+                        };
+                    }),
                 playersOnline: apiData.guild.players_online,
                 playersOffline: apiData.guild.players_offline,
                 membersTotal: apiData.guild.members_total,
@@ -125,6 +135,7 @@ export class GuildRepository implements IGuildRepository {
             vocation: m.vocation,
             status: m.status,
             lastSeen: m.lastSeen || new Date(),
+            isExited: m.isExited,
         }));
     }
 
@@ -142,6 +153,7 @@ export class GuildRepository implements IGuildRepository {
             vocation: m.vocation,
             status: m.status,
             lastSeen: m.lastSeen || new Date(),
+            isExited: m.isExited,
         }));
     }
 
@@ -158,6 +170,7 @@ export class GuildRepository implements IGuildRepository {
             vocation: member.vocation,
             status: member.status,
             lastSeen: member.lastSeen || new Date(),
+            isExited: member.isExited,
         };
     }
 
@@ -174,6 +187,30 @@ export class GuildRepository implements IGuildRepository {
             }
         } catch (error) {
             console.error('Erro ao limpar observações:', error);
+        }
+    }
+
+    async markMemberAsExited(memberName: string): Promise<void> {
+        try {
+            await prisma.guildMember.update({
+                where: { name: memberName },
+                data: { isExited: true },
+            });
+        } catch (error) {
+            console.error('Erro ao marcar membro como exitado:', error);
+            throw error;
+        }
+    }
+
+    async unmarkMemberAsExited(memberName: string): Promise<void> {
+        try {
+            await prisma.guildMember.update({
+                where: { name: memberName },
+                data: { isExited: false },
+            });
+        } catch (error) {
+            console.error('Erro ao desmarcar membro como exitado:', error);
+            throw error;
         }
     }
 }

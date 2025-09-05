@@ -35,6 +35,8 @@ export class GuildService {
         const guild = await this.getGuildDataWithCache();
         const onlineMembers = this.filterOnlineMembers(guild.members);
 
+        const exitedMembers = this.filterExitedMembers(guild.members);
+
         const analysis = {
             info: {
                 name: guild.name,
@@ -43,6 +45,7 @@ export class GuildService {
                 total: guild.playersOffline,
             },
             vocations: this.groupByVocation(onlineMembers, true),
+            exitedVocations: this.groupByVocation(exitedMembers, true),
             byLevel: this.splitByLevel(onlineMembers),
             sorted: this.sortByLevelDesc(onlineMembers),
             lastUpdated: new Date().toISOString(),
@@ -53,7 +56,11 @@ export class GuildService {
     }
 
     filterOnlineMembers(members: GuildMember[]): GuildMember[] {
-        return members.filter((m) => m.status !== 'offline');
+        return members.filter((m) => m.status !== 'offline' && !m.isExited);
+    }
+
+    filterExitedMembers(members: GuildMember[]): GuildMember[] {
+        return members.filter((m) => m.isExited);
     }
 
     groupByVocation(
@@ -115,5 +122,13 @@ export class GuildService {
 
     async cleanupOfflineMessages(): Promise<void> {
         await this.guildRepository.cleanupOfflineMembersMessages();
+    }
+
+    async markMemberAsExited(memberName: string): Promise<void> {
+        await this.guildRepository.markMemberAsExited(memberName);
+    }
+
+    async unmarkMemberAsExited(memberName: string): Promise<void> {
+        await this.guildRepository.unmarkMemberAsExited(memberName);
     }
 }
