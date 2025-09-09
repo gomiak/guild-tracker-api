@@ -34,3 +34,18 @@ model MemberMessage {
 
   @@map("member_messages")
 }
+
+model ExternalCharacter {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  level      Int
+  vocation   String
+  status     String   @default("offline")
+  lastSeen   DateTime?
+  isExited   Boolean  @default(false)
+  isExternal Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("external_characters")
+}

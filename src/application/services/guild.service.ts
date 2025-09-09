@@ -1,10 +1,20 @@
 import { IGuildRepository } from '../../domain/entities/repositories/guild.repository';
 import { Guild, GuildMember } from '../../domain/entities/guild.entity';
 import { prisma } from '../../lib/prisma';
-import { tibiaDataCache, analysisCache } from '../../lib/cache';
+import {
+    tibiaDataCache,
+    analysisCache,
+    externalCharacterCache,
+    combinedDataCache,
+} from '../../lib/cache';
+import { ExternalCharacterService } from './external-character.service';
 
 export class GuildService {
-    constructor(private guildRepository: IGuildRepository) {}
+    private externalCharacterService: ExternalCharacterService;
+
+    constructor(private guildRepository: IGuildRepository) {
+        this.externalCharacterService = new ExternalCharacterService();
+    }
 
     private async getGuildDataWithCache(): Promise<Guild> {
         const CACHE_KEY = 'tibiadata-fresh';
@@ -186,5 +196,69 @@ export class GuildService {
     async unmarkMemberAsExited(memberName: string): Promise<void> {
         await this.guildRepository.unmarkMemberAsExited(memberName);
         analysisCache.flushAll();
+    }
+
+    // Métodos para personagens externos
+    async addExternalCharacter(name: string): Promise<void> {
+        await this.externalCharacterService.addExternalCharacter(name);
+        analysisCache.flushAll();
+        combinedDataCache.flushAll();
+    }
+
+    async removeExternalCharacter(name: string): Promise<void> {
+        await this.externalCharacterService.removeExternalCharacter(name);
+        analysisCache.flushAll();
+        combinedDataCache.flushAll();
+    }
+
+    async getExternalCharacters() {
+        return await this.externalCharacterService.getExternalCharacters();
+    }
+
+    async markExternalCharacterAsExited(name: string): Promise<void> {
+        await this.externalCharacterService.markCharacterAsExited(name);
+        analysisCache.flushAll();
+        combinedDataCache.flushAll();
+    }
+
+    async unmarkExternalCharacterAsExited(name: string): Promise<void> {
+        await this.externalCharacterService.unmarkCharacterAsExited(name);
+        analysisCache.flushAll();
+        combinedDataCache.flushAll();
+    }
+
+    async syncExternalCharacters(): Promise<void> {
+        await this.externalCharacterService.syncExternalCharacters();
+        analysisCache.flushAll();
+        combinedDataCache.flushAll();
+    }
+
+    async getCombinedGuildAnalysis() {
+        const CACHE_KEY = 'combined-guild-analysis';
+        const cached = combinedDataCache.get<any>(CACHE_KEY);
+
+        if (cached) {
+            return cached;
+        }
+
+        // Buscar dados da guild
+        const guildAnalysis = await this.getFullGuildAnalysis();
+
+        // Buscar personagens externos
+        const externalCharacters = await this.getExternalCharacters();
+
+        // Combinar dados
+        const combinedAnalysis = {
+            ...guildAnalysis,
+            externalCharacters: externalCharacters,
+            info: {
+                ...guildAnalysis.info,
+                external: externalCharacters.length,
+                total: guildAnalysis.info.total + externalCharacters.length,
+            },
+        };
+
+        combinedDataCache.set(CACHE_KEY, combinedAnalysis);
+        return combinedAnalysis;
     }
 }

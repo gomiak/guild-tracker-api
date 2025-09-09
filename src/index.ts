@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import guildRoutes from './presentation/routes/guild.routes';
 import messagesRoutes from './presentation/routes/messages.routes';
+import externalCharacterRoutes from './presentation/routes/external-character.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,6 +44,7 @@ app.use(express.json());
 
 app.use('/api/guild', guildRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/external-characters', externalCharacterRoutes);
 
 app.get('/', (req, res) => {
     res.json({
@@ -52,6 +54,7 @@ app.get('/', (req, res) => {
             guildData: '/api/guild/data',
             messages: '/api/messages/data',
             forceRefresh: '/api/guild/force-refresh',
+            externalCharacters: '/api/external-characters',
             health: '/health',
         },
     });
