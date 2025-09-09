@@ -41,12 +41,33 @@ export class GuildService {
 
         const guild = await this.guildRepository.getGuildData();
 
-        // Buscar todos os membros do banco para fazer a junção
-        const allDbMembers = await prisma.guildMember.findMany();
-        const dbMembersMap = new Map(allDbMembers.map((m: any) => [m.name, m]));
+        // Query otimizada: buscar apenas membros online com status de exitado
+        const onlineMembersData = (await prisma.guildMember.findMany({
+            where: {
+                status: 'online',
+                lastSeen: { not: null },
+            },
+            select: {
+                name: true,
+                level: true,
+                vocation: true,
+                status: true,
+                lastSeen: true,
+                isExited: true,
+            },
+        })) as Array<{
+            name: string;
+            level: number;
+            vocation: string;
+            status: string;
+            lastSeen: Date | null;
+            isExited: boolean;
+        }>;
+
+        const dbMembersMap = new Map(onlineMembersData.map((m) => [m.name, m]));
 
         // Fazer a junção: API externa + dados do banco (incluindo isExited)
-        const enrichedMembers = guild.members.map((member: any) => {
+        const enrichedMembers = guild.members.map((member: GuildMember) => {
             const dbMember = dbMembersMap.get(member.name);
             return {
                 ...member,
@@ -57,13 +78,13 @@ export class GuildService {
 
         // Filtrar membros online (não offline e não exitados)
         const onlineMembers = enrichedMembers.filter(
-            (m: any) => m.status !== 'offline' && !m.isExited,
+            (m: GuildMember) => m.status !== 'offline' && !m.isExited,
         );
 
-        // Membros exitados que estão online
-        const exitedMembers = allDbMembers
-            .filter((m: any) => m.isExited && m.status !== 'offline')
-            .map((m: any) => ({
+        // Membros exitados que estão online (já filtrados na query)
+        const exitedMembers = onlineMembersData
+            .filter((m) => m.isExited)
+            .map((m) => ({
                 name: m.name,
                 level: m.level,
                 vocation: m.vocation,
