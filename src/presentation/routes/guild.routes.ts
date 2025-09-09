@@ -13,7 +13,12 @@ router.get('/data', async (req, res) => {
 
         res.json(data);
     } catch (error) {
-        res.status(500).json({ error: 'Erro ao buscar dados da guilda' });
+        console.error('Erro na rota /data:', error);
+        res.status(500).json({
+            error: 'Erro ao buscar dados da guilda',
+            details:
+                error instanceof Error ? error.message : 'Erro desconhecido',
+        });
     }
 });
 

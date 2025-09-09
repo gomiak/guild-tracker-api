@@ -14,10 +14,17 @@ export class GuildService {
             return cached;
         }
 
-        const freshData = await this.guildRepository.getGuildData();
-
-        tibiaDataCache.set(CACHE_KEY, freshData);
-        return freshData;
+        try {
+            const freshData = await this.guildRepository.getGuildData();
+            tibiaDataCache.set(CACHE_KEY, freshData);
+            return freshData;
+        } catch (error) {
+            console.error('Erro ao buscar dados da guild:', error);
+            if (cached) {
+                return cached;
+            }
+            throw error;
+        }
     }
 
     async getGuildData(): Promise<Guild> {
@@ -32,10 +39,38 @@ export class GuildService {
             return cached;
         }
 
-        const guild = await this.getGuildDataWithCache();
-        const onlineMembers = this.filterOnlineMembers(guild.members);
+        const guild = await this.guildRepository.getGuildData();
 
-        const exitedMembers = this.filterExitedMembers(guild.members);
+        // Buscar todos os membros do banco para fazer a junção
+        const allDbMembers = await prisma.guildMember.findMany();
+        const dbMembersMap = new Map(allDbMembers.map((m: any) => [m.name, m]));
+
+        // Fazer a junção: API externa + dados do banco (incluindo isExited)
+        const enrichedMembers = guild.members.map((member: any) => {
+            const dbMember = dbMembersMap.get(member.name);
+            return {
+                ...member,
+                isExited: dbMember?.isExited || false,
+                lastSeen: dbMember?.lastSeen || new Date(),
+            };
+        });
+
+        // Filtrar membros online (não offline e não exitados)
+        const onlineMembers = enrichedMembers.filter(
+            (m: any) => m.status !== 'offline' && !m.isExited,
+        );
+
+        // Membros exitados que estão online
+        const exitedMembers = allDbMembers
+            .filter((m: any) => m.isExited && m.status !== 'offline')
+            .map((m: any) => ({
+                name: m.name,
+                level: m.level,
+                vocation: m.vocation,
+                status: m.status,
+                lastSeen: m.lastSeen || new Date(),
+                isExited: m.isExited,
+            }));
 
         const analysis = {
             info: {
@@ -48,15 +83,13 @@ export class GuildService {
             exitedVocations: this.groupByVocation(exitedMembers, true),
             byLevel: this.splitByLevel(onlineMembers),
             sorted: this.sortByLevelDesc(onlineMembers),
+            exitedByLevel: this.splitByLevel(exitedMembers),
+            exitedSorted: this.sortByLevelDesc(exitedMembers),
             lastUpdated: new Date().toISOString(),
         };
 
         analysisCache.set(CACHE_KEY, analysis);
         return analysis;
-    }
-
-    filterOnlineMembers(members: GuildMember[]): GuildMember[] {
-        return members.filter((m) => m.status !== 'offline' && !m.isExited);
     }
 
     filterExitedMembers(members: GuildMember[]): GuildMember[] {
@@ -126,9 +159,11 @@ export class GuildService {
 
     async markMemberAsExited(memberName: string): Promise<void> {
         await this.guildRepository.markMemberAsExited(memberName);
+        analysisCache.flushAll();
     }
 
     async unmarkMemberAsExited(memberName: string): Promise<void> {
         await this.guildRepository.unmarkMemberAsExited(memberName);
+        analysisCache.flushAll();
     }
 }

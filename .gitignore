@@ -5,3 +5,5 @@ dev.db
 prisma/dev.db
 *.db
 dist
+
+.env.local

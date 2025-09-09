@@ -21,7 +21,14 @@ export class GuildRepository implements IGuildRepository {
 
     async getGuildData(): Promise<Guild> {
         try {
-            const response = await fetch(this.API_URL);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
+            const response = await fetch(this.API_URL, {
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`API returned ${response.status}`);
@@ -34,6 +41,11 @@ export class GuildRepository implements IGuildRepository {
             return await this.mapToDomain(apiData);
         } catch (error) {
             console.error('Error fetching guild data:', error);
+            if (error instanceof Error && error.name === 'AbortError') {
+                throw new Error(
+                    'Timeout ao buscar dados da guild - API externa demorou para responder',
+                );
+            }
             throw new Error('Failed to fetch guild data');
         }
     }
@@ -43,42 +55,100 @@ export class GuildRepository implements IGuildRepository {
             (await prisma.guildMember.findMany()) as unknown as DatabaseMember[];
         const dbMembersMap = new Map(dbMembers.map((m) => [m.name, m]));
 
-        const transactions = [];
+        const exitedMembers = dbMembers.filter((m) => m.isExited);
+        const onlineMemberNames = new Set(members.map((m) => m.name));
 
-        for (const member of members) {
-            const existingMember = dbMembersMap.get(member.name);
-
-            let updateData: any = {
-                level: member.level,
-                vocation: member.vocation,
-                status: member.status,
-            };
-
-            if (member.status === 'online') {
-                if (!existingMember || existingMember.status === 'offline') {
-                    updateData.lastSeen = new Date();
-                }
-            } else {
-                updateData.lastSeen = null;
-                await prisma.memberMessage.deleteMany({
-                    where: { name: member.name },
+        for (const exitedMember of exitedMembers) {
+            if (!onlineMemberNames.has(exitedMember.name)) {
+                await this.executeWithRetry(async () => {
+                    await prisma.guildMember.update({
+                        where: { name: exitedMember.name },
+                        data: { isExited: false },
+                    });
                 });
             }
-
-            transactions.push(
-                prisma.guildMember.upsert({
-                    where: { name: member.name },
-                    update: updateData,
-                    create: {
-                        name: member.name,
-                        ...updateData,
-                        lastSeen: updateData.lastSeen ?? new Date(),
-                    },
-                }),
-            );
         }
 
-        await prisma.$transaction(transactions);
+        const batchSize = 5;
+        for (let i = 0; i < members.length; i += batchSize) {
+            const batch = members.slice(i, i + batchSize);
+            const transactions: any[] = [];
+
+            for (const member of batch) {
+                const existingMember = dbMembersMap.get(member.name);
+
+                let updateData: any = {
+                    level: member.level,
+                    vocation: member.vocation,
+                    status: member.status,
+                };
+
+                if (existingMember) {
+                    updateData.isExited = existingMember.isExited;
+                } else {
+                    updateData.isExited = false;
+                }
+
+                if (member.status === 'online') {
+                    if (
+                        !existingMember ||
+                        existingMember.status === 'offline'
+                    ) {
+                        updateData.lastSeen = new Date();
+                    }
+                } else {
+                    updateData.lastSeen = null;
+                    transactions.push(
+                        prisma.memberMessage.deleteMany({
+                            where: { name: member.name },
+                        }),
+                    );
+                }
+
+                transactions.push(
+                    prisma.guildMember.upsert({
+                        where: { name: member.name },
+                        update: updateData,
+                        create: {
+                            name: member.name,
+                            ...updateData,
+                            lastSeen: updateData.lastSeen ?? new Date(),
+                        },
+                    }),
+                );
+            }
+
+            await this.executeWithRetry(() =>
+                prisma.$transaction(transactions),
+            );
+        }
+    }
+
+    private async executeWithRetry<T>(
+        operation: () => Promise<T>,
+        maxRetries: number = 3,
+    ): Promise<T> {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await operation();
+            } catch (error: any) {
+                if (
+                    error.code === 'P2034' ||
+                    error.message.includes('deadlock') ||
+                    error.message.includes('lock')
+                ) {
+                    if (attempt === maxRetries) {
+                        throw error;
+                    }
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, Math.random() * 1000 + 100),
+                    );
+                } else {
+                    throw error;
+                }
+            }
+        }
+        throw new Error('Máximo de tentativas excedido');
     }
 
     private async mapToDomain(apiData: any): Promise<Guild> {
@@ -192,9 +262,11 @@ export class GuildRepository implements IGuildRepository {
 
     async markMemberAsExited(memberName: string): Promise<void> {
         try {
-            await prisma.guildMember.update({
-                where: { name: memberName },
-                data: { isExited: true },
+            await this.executeWithRetry(async () => {
+                await prisma.guildMember.update({
+                    where: { name: memberName },
+                    data: { isExited: true },
+                });
             });
         } catch (error) {
             console.error('Erro ao marcar membro como exitado:', error);
@@ -204,9 +276,11 @@ export class GuildRepository implements IGuildRepository {
 
     async unmarkMemberAsExited(memberName: string): Promise<void> {
         try {
-            await prisma.guildMember.update({
-                where: { name: memberName },
-                data: { isExited: false },
+            await this.executeWithRetry(async () => {
+                await prisma.guildMember.update({
+                    where: { name: memberName },
+                    data: { isExited: false },
+                });
             });
         } catch (error) {
             console.error('Erro ao desmarcar membro como exitado:', error);
